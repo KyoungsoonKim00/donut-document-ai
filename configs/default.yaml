@@ -1,0 +1,82 @@
+# Donut Document AI — default configuration
+# All paths are relative to the project root unless absolute.
+
+paths:
+  # Raw PDFs to convert / run inference on.
+  pdf_dir: data/raw_pdf
+  # Where PDF→PNG conversion writes images.
+  image_dir: data/images
+  # Labeling Excel workbook (one row per document).
+  excel_path: data/labeling.xlsx
+  # Directory holding the generated Donut JSON labels (+ matching PNGs for training).
+  dataset_dir: data/dataset
+  # Output directory for the fine-tuned model + checkpoints.
+  output_dir: outputs/donut_finetuned
+  # Where inference writes prediction JSON files.
+  prediction_dir: outputs/predictions
+
+model:
+  # Base checkpoint or a local fine-tuned dir.
+  name: naver-clova-ix/donut-base
+  # Donut task prompt; also used as the decoder start token.
+  task_prompt: "<s_gt_parse>"
+  # Image size fed to the encoder (height, width). donut-base default is 2560x1920;
+  # the original training used 720x960 to fit VRAM.
+  image_height: 720
+  image_width: 960
+  max_length: 512
+
+pdf:
+  dpi: 300
+  first_page: 1
+  last_page: 1
+
+train:
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  max_grad_norm: 1.0
+  num_train_epochs: 15
+  logging_steps: 10
+  eval_strategy: epoch
+  save_strategy: epoch
+  fp16: true
+  val_split: 0.2
+  seed: 42
+
+inference:
+  num_beams: 5
+  early_stopping: true
+
+# Field schema for the Excel → JSON conversion.
+schema:
+  # Numeric fields: parsed with smart_number (comma lists -> list, "" -> "").
+  numeric_fields:
+    - 서류특성.합계금액
+    - 피공급자.거래전미지급금
+    - 피공급자.입금액
+    - 피공급자.현잔액
+    - 품목.number
+    - 품목.수량
+    - 품목.단가
+    - 품목.공급가액
+    - 품목.세액
+    - 품목.수량합계
+    - 품목.공급가액합계
+    - 품목.세액합계
+  # Document type whose item-level fields are dropped (입고서류 has no line items).
+  doc_type_field: 서류특성.서류종류
+  exclude_doc_type: 입고서류
+  exclude_fields_for_doc_type:
+    - 품목.number
+    - 품목.수량
+    - 품목.단가
+    - 품목.공급가액
+    - 품목.세액
+    - 품목.수량합계
+    - 품목.공급가액합계
+    - 품목.세액합계
+  # List-valued fields are joined into a comma string before serialization.
+  stringify_list_fields: true

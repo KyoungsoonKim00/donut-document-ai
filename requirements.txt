@@ -1,0 +1,13 @@
+torch>=2.0
+transformers>=4.51
+datasets>=2.0
+sentencepiece
+Pillow
+pdf2image
+openpyxl
+pandas
+numpy
+scikit-learn
+matplotlib
+PyYAML
+huggingface_hub

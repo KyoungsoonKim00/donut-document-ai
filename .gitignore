@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Model weights (use Hugging Face Hub instead — see README)
+*.bin
+*.safetensors
+*.pt
+*.pth
+checkpoint-*/
+donut_finetuned*/
+outputs/
+
+# Data (private invoices — never commit). Leading slash = repo root only,
+# so the src/donut_docai/data package is NOT excluded.
+/data/
+*.pdf
+*.xlsx
+*.png
+!docs/**/*.png
+
+# Logs
+logs/
+*.log
+runs/

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "donut-docai"
+version = "0.1.0"
+description = "End-to-end Donut document AI for Korean transaction statements"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.0",
+    "transformers>=4.51",
+    "datasets>=2.0",
+    "sentencepiece",
+    "Pillow",
+    "pdf2image",
+    "openpyxl",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "matplotlib",
+    "PyYAML",
+    "huggingface_hub",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
