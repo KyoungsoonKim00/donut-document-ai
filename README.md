@@ -1,101 +1,99 @@
-# Donut Document AI — Korean Transaction-Statement Parser
+# Donut Document AI — 거래명세표/계산서 파서
 
-End-to-end document parsing for Korean transaction statements (거래명세표 / 계산서)
-built on [Donut](https://github.com/clovaai/donut) (`naver-clova-ix/donut-base`).
-The model reads a document **image** and directly outputs **structured JSON** —
-no OCR + rule engine in between.
+[Donut](https://github.com/clovaai/donut)(`naver-clova-ix/donut-base`) 기반의
+End-to-End 문서 파싱 프로젝트. 한국어 거래명세표·계산서 **이미지**를 입력받아
+중간 OCR·규칙엔진 없이 **구조화된 JSON**을 바로 출력한다.
 
 ```
-PDF ──▶ PNG ──▶ Donut (Swin encoder + mBART decoder) ──▶ JSON fields
+PDF ──▶ PNG ──▶ Donut (Swin 인코더 + mBART 디코더) ──▶ JSON 필드
 ```
 
-This repository refactors an original capstone notebook pipeline into a
-configurable, scriptable package.
+원본 캡스톤 노트북 파이프라인을, 설정 가능하고 스크립트로 실행되는 패키지로
+리팩터링한 저장소다.
 
 ```mermaid
 flowchart LR
-    A[PDF documents] -->|01 pdf_to_image| B[PNG images]
-    B -->|02 prepare_labels| C[Labeling Excel]
-    C -->|human labeling| C
-    C -->|03 excel_to_json| D[Donut JSON labels]
-    D -->|04 train| E[Fine-tuned Donut]
+    A[PDF 문서] -->|01 pdf_to_image| B[PNG 이미지]
+    B -->|02 prepare_labels| C[라벨링 Excel]
+    C -->|사람이 라벨링| C
+    C -->|03 excel_to_json| D[Donut JSON 라벨]
+    D -->|04 train| E[파인튜닝된 Donut]
     B --> F
     E --> F[05 inference]
-    F --> G[Structured JSON]
+    F --> G[구조화 JSON]
 ```
 
 ---
 
-## Why end-to-end (Donut) over OCR + templates
+## 왜 OCR+템플릿이 아니라 End-to-End(Donut)인가
 
-An earlier version of this project used a classic CV/OCR pipeline
-(PDF → image → ORB template alignment → per-field Tesseract OCR). It was brittle:
-every new store layout needed new alignment templates and field boxes. Donut
-replaces that with a single image-to-sequence model that learns the layout +
-field semantics jointly, so new layouts only need labeled examples, not code.
+초기 버전은 전통적인 CV/OCR 파이프라인(PDF → 이미지 → ORB 템플릿 정렬 →
+필드별 Tesseract OCR)을 썼다. 매장 양식이 바뀔 때마다 정렬 템플릿과 필드 박스를
+새로 만들어야 해서 깨지기 쉬웠다. Donut은 이를 단일 image-to-sequence 모델로
+대체한다. 레이아웃과 필드 의미를 함께 학습하므로, 새 양식은 코드가 아니라
+**라벨링된 예시**만 추가하면 된다.
 
-## Output schema
+## 출력 스키마
 
-Fields are grouped by prefix:
+필드는 접두사로 그룹화된다.
 
-| Group | Fields |
+| 그룹 | 필드 |
 |-------|--------|
 | `서류특성.*` | 서류종류, 거래일, 합계금액 |
 | `피공급자.*` | 이름, 거래전미지급금, 입금액, 현잔액 |
 | `품목.*` | 품목명, 코드, 단위, 수량, 단가, 공급가액, 세액, 수량합계, 공급가액합계, 세액합계 |
 
-`입고서류` (incoming-goods) documents have no line items, so item-level
-`품목.*` fields are dropped automatically during label generation.
+`입고서류`는 품목 라인이 없으므로, 라벨 생성 시 `품목.*` 필드를 자동 제외한다.
 
-## Project layout
+## 프로젝트 구조
 
 ```
 donut-document-ai/
-├── configs/default.yaml        # paths, hyperparameters, field schema
+├── configs/default.yaml        # 경로, 하이퍼파라미터, 필드 스키마
 ├── src/donut_docai/
-│   ├── config.py               # YAML -> dataclass
+│   ├── config.py               # YAML -> dataclass 로더
 │   ├── data/
-│   │   ├── pdf_to_image.py      # PDF -> PNG (first page, configurable DPI)
-│   │   ├── filename_to_excel.py # seed label workbook with filenames
-│   │   └── excel_to_json.py     # labeled Excel -> Donut JSON
-│   ├── dataset.py              # JSON + image -> HF Dataset + preprocessing
-│   ├── train.py                # Seq2SeqTrainer fine-tuning
-│   └── inference.py            # load model, predict, parse JSON
-└── scripts/                    # 01..05 CLI entry points
+│   │   ├── pdf_to_image.py      # PDF -> PNG (첫 페이지, DPI 설정 가능)
+│   │   ├── filename_to_excel.py # 라벨링 워크북에 파일명 시드
+│   │   └── excel_to_json.py     # 라벨링 Excel -> Donut JSON
+│   ├── dataset.py              # JSON + 이미지 -> HF Dataset + 전처리
+│   ├── train.py                # Seq2SeqTrainer 파인튜닝
+│   └── inference.py            # 모델 로드, 예측, JSON 파싱
+└── scripts/                    # 01~05 CLI 진입점
 ```
 
-## Install
+## 설치
 
-Requires Python 3.9+ and the [poppler](https://github.com/oschwartz10612/poppler-windows)
-binaries on PATH (for `pdf2image`). A CUDA GPU is strongly recommended for training.
+Python 3.9 이상, 그리고 `pdf2image`가 쓰는 [poppler](https://github.com/oschwartz10612/poppler-windows)
+바이너리가 PATH에 있어야 한다. 학습에는 CUDA GPU를 강력히 권장한다.
 
 ```bash
 pip install -e .
-# or: pip install -r requirements.txt
+# 또는: pip install -r requirements.txt
 ```
 
-## Workflow
+## 실행 흐름
 
-All steps read `configs/default.yaml`; any path can be overridden via flags.
+모든 단계는 `configs/default.yaml`을 읽으며, 경로는 플래그로 덮어쓸 수 있다.
 
 ```bash
-# 1. Render PDFs to PNG
+# 1. PDF를 PNG로 렌더링
 python scripts/01_pdf_to_image.py --config configs/default.yaml
 
-# 2. Seed the labeling workbook with filenames (then fill in fields by hand)
+# 2. 라벨링 워크북에 파일명 채우기 (이후 사람이 필드 값 입력)
 python scripts/02_prepare_labels.py
 
-# 3. Convert the labeled Excel into Donut JSON labels
+# 3. 라벨링된 Excel을 Donut JSON 라벨로 변환
 python scripts/03_excel_to_json.py
 
-# 4. Fine-tune Donut  (place matching <name>.png next to each <name>.json)
+# 4. Donut 파인튜닝 (각 <이름>.json 옆에 같은 이름의 <이름>.png 배치)
 python scripts/04_train.py
 
-# 5. Run inference over a folder of images (local dir or HF repo id)
+# 5. 이미지 폴더에 대해 추론 (로컬 경로 또는 HF repo id)
 python scripts/05_inference.py --model ksk00/donut-docai
 ```
 
-### Programmatic use
+### 코드로 직접 사용
 
 ```python
 from donut_docai import load_config
@@ -107,59 +105,59 @@ raw, parsed = predictor.predict("data/images/sample.png")
 print(parsed)
 ```
 
-## Model weights
+## 모델 가중치
 
-Fine-tuned weights are **not** committed (see `.gitignore`). Publish them to the
-Hugging Face Hub and load by repo id:
+파인튜닝 가중치는 git에 커밋하지 않는다(`.gitignore` 참고). Hugging Face Hub에
+올린 뒤 repo id로 불러온다.
 
 ```python
 predictor = DonutPredictor(cfg, model_path="ksk00/donut-docai")
 ```
 
-Published model: **[ksk00/donut-docai](https://huggingface.co/ksk00/donut-docai)**
+공개 모델: **[ksk00/donut-docai](https://huggingface.co/ksk00/donut-docai)**
 
-First time using Hugging Face? Follow [`docs/huggingface_upload.md`](docs/huggingface_upload.md),
-then upload with:
+Hugging Face가 처음이라면 [`docs/huggingface_upload.md`](docs/huggingface_upload.md)
+가이드를 따른 뒤 업로드한다.
 
 ```bash
-python scripts/upload_to_hf.py --model-dir <local-model> --repo-id <user>/donut-docai
+python scripts/upload_to_hf.py --model-dir <로컬-모델-경로> --repo-id <사용자명>/donut-docai
 ```
 
-## Training configuration
+## 학습 설정
 
-| Setting | Value |
+| 항목 | 값 |
 |---------|-------|
-| Base model | `naver-clova-ix/donut-base` (Swin-B encoder + mBART decoder) |
-| Image size | 720 × 960 |
-| Task prompt | `<s_gt_parse>` |
-| Optimizer | AdamW, lr 5e-5, weight decay 0.01, warmup 5% |
-| Epochs | 15, batch size 1, fp16, gradient checkpointing |
-| Max sequence length | 512 |
+| 베이스 모델 | `naver-clova-ix/donut-base` (Swin-B 인코더 + mBART 디코더) |
+| 이미지 크기 | 720 × 960 |
+| Task 프롬프트 | `<s_gt_parse>` |
+| 옵티마이저 | AdamW, lr 5e-5, weight decay 0.01, warmup 5% |
+| 에폭 | 15, 배치 크기 1, fp16, gradient checkpointing |
+| 최대 시퀀스 길이 | 512 |
 
-## Results
+## 결과
 
-Training converges cleanly — cross-entropy loss drops from ~7.7 to ~0.3 with
-train and validation curves tracking closely:
+학습이 안정적으로 수렴한다. Cross-entropy 손실이 약 7.7에서 0.3까지 떨어지고
+train·validation 곡선이 가깝게 따라간다.
 
-![Training vs validation loss](docs/images/loss_curve.png)
+![학습 vs 검증 손실](docs/images/loss_curve.png)
 
-On shorter runs / smaller label sets the validation loss plateaus while training
-loss keeps falling — the overfitting signal that motivates the limitations below:
+학습 step이 짧거나 라벨 수가 적은 경우, train 손실은 계속 떨어지는데 validation
+손실은 정체된다. 아래 한계 항목으로 이어지는 과적합 신호다.
 
-![Overfitting signal](docs/images/loss_curve_overfit.png)
+![과적합 신호](docs/images/loss_curve_overfit.png)
 
-## Known limitations
+## 알려진 한계
 
-This was trained on a **small** in-house dataset (tens of documents). With so few
-examples the model overfits and can collapse into repeated tokens on unseen
-layouts (e.g. `"액액액..."`). Honest next steps to improve it:
+소량의 자체 데이터(문서 수십 건)로 학습했다. 예시가 적어 모델이 과적합하고,
+처음 보는 양식에서는 같은 토큰을 반복하며 붕괴할 수 있다(예: `"액액액..."`).
+솔직한 개선 방향은 다음과 같다.
 
-- Collect more labeled documents per store layout.
-- Augment images (rotation, blur, brightness) for robustness.
-- Add field-level evaluation (exact match / tree-edit distance) instead of eyeballing.
-- Constrain decoding to the known field schema.
+- 매장 양식별로 라벨링 문서를 더 수집한다.
+- 이미지 증강(회전·블러·밝기)으로 강건성을 높인다.
+- 눈으로 보는 대신 필드 단위 평가(exact match / tree-edit distance)를 추가한다.
+- 디코딩을 알려진 필드 스키마로 제약한다.
 
-## Acknowledgements
+## 참고
 
 - [Donut: OCR-free Document Understanding Transformer](https://arxiv.org/abs/2111.15664) (Kim et al., 2022)
-- `naver-clova-ix/donut-base` on the Hugging Face Hub
+- Hugging Face Hub의 `naver-clova-ix/donut-base`
